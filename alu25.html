@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Konfigurator Żaluzji Aluminiowych 25mm</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+        h1 {
+            font-size: 2em;
+            margin-bottom: 20px;
+        }
+        .config-section {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input, select {
+            padding: 5px;
+            width: 200px;
+            margin-bottom: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            font-size: 1em;
+            cursor: pointer;
+        }
+        #order-summary {
+            margin-top: 30px;
+        }
+        .summary {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Konfigurator Żaluzji Aluminiowych 25mm</h1>
+
+    <div class="config-section">
+        <label for="width">Szerokość (cm):</label>
+        <input type="number" id="width" min="40" max="260" placeholder="Wprowadź szerokość">
+    </div>
+
+    <div class="config-section">
+        <label for="height">Wysokość (cm):</label>
+        <input type="number" id="height" min="40" max="260" placeholder="Wprowadź wysokość">
+    </div>
+
+    <div class="config-section">
+        <label for="side_control">Strona sterowania:</label>
+        <select id="side_control">
+            <option value="Left">Lewa</option>
+            <option value="Right">Prawa</option>
+        </select>
+    </div>
+
+    <button onclick="calculatePrice()">Oblicz cenę</button>
+    <button onclick="addToOrder()">Dodaj do zamówienia</button>
+    <button onclick="generatePDF()">Zapisz zamówienie jako PDF</button>
+
+    <h2>Podsumowanie</h2>
+    <p class="summary" id="summary">Cena: 0zł</p>
+    <p id="allegro-units">Liczba sztuk (Allegro): 0</p>
+
+    <h2>Zamówienie</h2>
+    <div id="order-summary">
+        <ul id="order-list"></ul>
+        <p class="summary" id="total-price">Całkowita cena: 0zł</p>
+        <p class="summary" id="total-units">Całkowita liczba sztuk (Allegro): 0</p>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <script>
+        let totalPrice = 0;
+        let totalUnits = 0;
+        let orders = [];
+
+        // Funkcja obliczająca cenę
+        function calculatePrice() {
+            let width = parseInt(document.getElementById('width').value);
+            let height = parseInt(document.getElementById('height').value);
+            const pricePerSquareMeter = 130; // Cena za m²
+            const automationCost = 20; // Ukryty koszt automatu
+
+            if (!width || !height || width <= 0 || height <= 0) {
+                alert("Proszę wprowadzić poprawne wymiary.");
+                return;
+            }
+
+            // Obliczenie powierzchni w metrach kwadratowych
+            let area = (width / 100) * (height / 100);
+            let price = area * pricePerSquareMeter;
+
+            // Dodanie kosztu za automat (niewidoczna opcja)
+            price += automationCost;
+
+            // Obniżenie ceny o 5%
+            price = price * 0.95;
+
+            // Oblicz liczbę sztuk dla Allegro (5zł = 1 sztuka)
+            let allegroUnits = Math.ceil(price / 5);
+
+            // Wyświetl cenę i liczbę sztuk
+            document.getElementById('summary').innerText = `Cena: ${price.toFixed(2)}zł`;
+            document.getElementById('allegro-units').innerText = `Liczba sztuk (Allegro): ${allegroUnits}`;
+            
+            return { price: price.toFixed(2), allegroUnits };
+        }
+
+        // Funkcja dodająca pozycję do zamówienia
+        function addToOrder() {
+            let width = document.getElementById('width').value;
+            let height = document.getElementById('height').value;
+            let sideControl = document.getElementById('side_control').value;
+
+            const result = calculatePrice();
+            if (!result) return;
+
+            const orderItem = {
+                szerokość: width,
+                wysokość: height,
+                "strona sterowania": sideControl,
+                cena: result.price,
+                "sztuki (Allegro)": result.allegroUnits
+            };
+
+            // Dodanie pozycji do listy zamówienia
+            const orderList = document.getElementById('order-list');
+            const listItem = document.createElement('li');
+            listItem.innerHTML = `Szerokość: ${orderItem.szerokość} cm, Wysokość: ${orderItem.wysokość} cm, Strona sterowania: ${orderItem["strona sterowania"]}, Cena: ${orderItem.cena} zł, Sztuki: ${orderItem["sztuki (Allegro)"]} <button onclick="removeOrder(this, ${orderItem.cena}, ${orderItem["sztuki (Allegro)"]})">Usuń</button>`;
+            orderList.appendChild(listItem);
+
+            orders.push(orderItem);
+
+            // Zaktualizuj całkowitą cenę i liczbę sztuk
+            totalPrice += parseFloat(orderItem.cena);
+            totalUnits += parseInt(orderItem["sztuki (Allegro)"]);
+            document.getElementById('total-price').innerText = `Całkowita cena: ${totalPrice.toFixed(2)}zł`;
+            document.getElementById('total-units').innerText = `Całkowita liczba sztuk (Allegro): ${totalUnits}`;
+        }
+
+        // Funkcja usuwająca pozycję z zamówienia
+        function removeOrder(button, price, units) {
+            // Usuń element z listy zamówienia
+            const listItem = button.parentElement;
+            listItem.remove();
+
+            // Odejmij cenę i liczbę sztuk od całkowitej ceny i sztuk
+            totalPrice -= parseFloat(price);
+            totalUnits -= parseInt(units);
+            document.getElementById('total-price').innerText = `Całkowita cena: ${totalPrice.toFixed(2)}zł`;
+            document.getElementById('total-units').innerText = `Całkowita liczba sztuk (Allegro): ${totalUnits}`;
+        }
+
+        // Funkcja generująca plik PDF
+        function generatePDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            doc.setFontSize(12);
+            doc.text("Zamówienie Żaluzji Aluminiowych 25mm", 10, 10);
+
+            doc.autoTable({
+                head: [['Szerokość', 'Wysokość', 'Strona sterowania', 'Cena', 'Sztuki (Allegro)']],
+                body: orders.map(order => [
+                    `${order.szerokość} cm`,
+                    `${order.wysokość} cm`,
+                    order["strona sterowania"],
+                    `${order.cena} zł`,
+                    `${order["sztuki (Allegro)"]}`
+                ])
+            });
+
+            doc.text(`Całkowita cena: ${totalPrice.toFixed(2)}zł`, 10, doc.lastAutoTable.finalY + 10);
+            doc.save("zamowienie_zaluzji_aluminiowych.pdf");
+        }
+    </script>
+
+</body>
+</html>
